@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+set -e
+
+setup() {
+  cat <<EOF
+
+The first thing that we are going to do to set up our dual integration
+example application is to make a chain with [eris chains make]. This
+command will utilize the eris chain-manager tooling to create a new
+smart contract compatible blockchain which we will use for the
+application.
+
+The eris chain-manager tooling is sophisticated enough to be able to
+assemble the proper files for a wide variety of smart contract
+compatible chains. To see more about this command later please
+type [eris chains make --help] into your command line.
+
+EOF
+  eris chains make dualintegrator --account-types=Full:1,Participant:1
+
+  cat <<EOF
+Now that we have created a chain to run our application, we will turn
+the chain on with [eris chains start]. This command will turn on the
+chain for us so it is running and can have contracts deployed to it.
+
+As part of our start process we will pass the [--init-dir] flag to
+the [eris chains start] command. This will force the chain to utilize
+the configuration, genesis.json, and key_pair that have been written
+into the proper directory on our host machine.
+
+For more about how eris starts chains please type into your command line
+[eris chains start --help]
+
+EOF
+  eris chains new dualintegrator --dir dualintegrator/dualintegrator_full_000
+  cp $HOME/.eris/chains/dualintegrator/accounts.json .
+
+  cat <<EOF
+We have a chain running. Now we will deploy our smart contracts to it.
+To perform this command, we will utilize the eris package-manager
+tooling. This tooling is built to assist developers in the establishment
+of smart contract systems on their chains.
+
+We will do so by running the [eris pkgs do] command. To see more about
+the eris package-manager please run [eris pkgs do --help] in your
+command line.
+
+EOF
+  addr=$(cat $HOME/.eris/chains/dualintegrator/addresses.csv | grep "full_000" | cut -d ',' -f 1)
+  addr2=$(cat $HOME/.eris/chains/dualintegrator/addresses.csv | grep "participant_000" | cut -d ',' -f 1)
+  eris pkgs do --chain dualintegrator --address $addr --set "addr1=$addr" --set "addr2=$addr2" 1>/dev/null
+
+  cat <<EOF
+
+We've now reached the final stage of the setup process. We've created
+and started a chain, and deployed our suite of contracts to it and
+tested that they are properly connected. Now we will make sure that
+the IPFS distributed file system service is running as the application
+will utilize this. We will do this with [eris services start ipfs].
+
+We will also copy over the accounts.json file that was created by
+the chain-manager. This file will be utilized by eris-contracts.js
+to make sure that interaction with the contracts uses the proper
+key pair.
+
+Finally, we will our starting process is we are going to take this
+repository that you've downloaded and we are going to build it into
+a docker container. This will ensure that you do not need to have
+node installed on your machine, nor any of the node modules which
+this repository needs to run.
+
+EOF
+  # note forcibly assumes the `eris` machine on OSX
+  if [ "$(uname)" == "Darwin" ]; then
+    ip=$(docker-machine ip eris)
+    if [[ "$ip" == "" ]]; then
+      echo "Please make sure you are using your eris docker-machine"
+      exit 1
+    fi
+    sed -i -e "s/"MY_HOST=localhost\",/"MY_HOST=$ip\",/g" ./dualintegrator.toml
+    rm ./dualintegrator.toml-e &>/dev/null
+  fi
+  docker build -t dualintegrator . &>/dev/null
+  cp ./dualintegrator.toml $HOME/.eris/services/.
+}
+
+main() {
+  setup
+}
+
+main $@

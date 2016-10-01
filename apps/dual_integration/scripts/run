@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+echo "Hello! I'm the marmot who runs the Dual Integration example application."
+
+run() {
+  cat <<EOF
+Finally, we will move the dualintegrator service definition file
+that was included in this repository to the ~/.eris/services dir
+and then we will run [eris services start dualintegrator].
+
+EOF
+  eris services start dualintegrator
+  eris services logs dualintegrator -f
+}
+
+main() {
+  scripts/clean
+  scripts/build
+  if [ $? -ne 0 ]; then scripts/clean; exit 1; fi
+  run
+  trap "trap - SIGTERM; scripts/clean; kill -- -$$" SIGINT SIGTERM EXIT
+  tail -f /dev/null & wait
+}
+
+main $@
